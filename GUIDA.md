@@ -1,4 +1,4 @@
-# 📖 GUIDA passo-passo — DM Assistant (Progetto TAP)
+# GUIDA passo-passo — DM Assistant (Progetto TAP)
 
 > Guida pensata per chi **parte da zero**: non serve conoscere Kafka, Spark o Elasticsearch.
 > Segui i passi nell'ordine. Dove vedi un blocco grigio, è un comando da copiare nel terminale.
@@ -15,44 +15,8 @@ del gruppo mentre la partita va avanti.
 
 È l'esempio perfetto di **stream processing**: un segnale entra grezzo → viene arricchito → esce utile.
 
-```
- Video YouTube ──(Whisper)──► transcript.jsonl
-        │
-        ▼
- [Producer]  rigioca gli eventi rispettando i tempi reali
-        │  (topic Kafka: dnd-events)
-        ▼
- [Apache Kafka]  bus di messaggi in tempo reale
-        │
-        ▼
- [Spark]  per ogni evento chiama ►► [Claude / LLM] ◄◄ che genera il suggerimento
-        │  (topic Kafka: dnd-enriched)
-        ▼
- [Logstash]  prende gli eventi arricchiti e li indicizza
-        │
-        ▼
- [Elasticsearch]  archivia e indicizza
-        │
-        ▼
- [Kibana]  dashboard live per il Dungeon Master
-```
-
-### A cosa serve ogni pezzo (la "traduzione" delle parole difficili)
-
-| Tecnologia | In una frase |
-|---|---|
-| **Whisper** | Trasforma l'audio di un video in testo con i tempi (la sorgente dati). |
-| **Producer** | Un piccolo programma che "rigioca" la partita inviando un evento alla volta. |
-| **Apache Kafka** | Un nastro trasportatore di messaggi: chi produce e chi consuma sono separati. |
-| **Spark** | Il motore che legge gli eventi uno a uno e li arricchisce (qui chiama Claude). |
-| **Claude (LLM)** | L'intelligenza artificiale che capisce l'evento e scrive il suggerimento per il DM. |
-| **Logstash** | Lo strumento di *ingestion*: prende gli eventi arricchiti e li mette in Elasticsearch. |
-| **Elasticsearch** | Il database/motore di ricerca dove finiscono tutti gli eventi. |
-| **Kibana** | La dashboard grafica che il Dungeon Master guarda. |
-| **Docker Compose** | Avvia tutti questi servizi insieme con **un solo comando**. |
-
-Questi sono esattamente i componenti richiesti dal progetto TAP (ingestion, streaming,
-processing, machine learning via servizio esterno, indexing, visualization, + Docker).
+Lo schema dell'architettura e il ruolo di ogni tecnologia (Kafka, Spark, Claude,
+Logstash, Elasticsearch, Kibana, Docker) sono descritti nel [README.md](README.md).
 
 ---
 
@@ -81,7 +45,7 @@ processing, machine learning via servizio esterno, indexing, visualization, + Do
 
 Se il progetto è su GitHub:
 ```bash
-git clone https://github.com/TUO-UTENTE/dnd-realtime-dm.git
+git clone https://github.com/xNack/dnd-realtime-dm.git
 cd dnd-realtime-dm
 ```
 
@@ -94,7 +58,7 @@ cd percorso/della/cartella/dnd-realtime-dm
 
 ## 4. Step 2 — Crea l'account Claude e ottieni la chiave API
 
-> ⚠️ Importante: l'account dell'**app/chat** di Claude è diverso dall'accesso alla
+> Importante: l'account dell'**app/chat** di Claude è diverso dall'accesso alla
 > **Console per sviluppatori** (quella delle API). Per questo progetto serve la
 > **Console**, su `console.anthropic.com`. Puoi comunque accedere con la stessa email.
 
@@ -116,12 +80,12 @@ Le API non sono incluse nell'abbonamento del chatbot: si pagano a consumo, ma co
 1. Vai in **Settings → API Keys** (oppure menu **API Keys**).
 2. Clicca **Create Key**, dai un nome (es. `tap-dnd`) e conferma.
 3. **Copia subito** la chiave: inizia con `sk-ant-...` e si vede **una sola volta**.
-   - ⚠️ Conservala in un posto sicuro. Se la perdi, ne crei semplicemente una nuova.
-   - ⚠️ **Non** condividerla e **non** caricarla su GitHub (il file `.env` è già in `.gitignore`).
+ - Conservala in un posto sicuro. Se la perdi, ne crei semplicemente una nuova.
+ - **Non** condividerla e **non** caricarla su GitHub (il file `.env` è già in `.gitignore`).
 
 Questa chiave è ciò che incollerai nel file `.env` allo Step 3.
 
-> 💡 Come funziona l'API di Claude (in breve): il nostro programma manda a Claude un
+> Come funziona l'API di Claude (in breve): il nostro programma manda a Claude un
 > messaggio (l'evento di gioco + le ultime frasi come contesto) e Claude risponde con un
 > JSON che contiene il suggerimento per il DM. Tutto questo è già scritto in
 > `spark/stream_job.py` — non devi programmare nulla, ti basta inserire la chiave.
@@ -153,7 +117,7 @@ CLAUDE_MODEL=claude-haiku-4-5
 Il progetto include già `data/transcript.jsonl` (una sessione di esempio): **puoi saltare
 questo step** e andare diretto allo Step 5. Ma per la demo "vera" conviene usare un tuo video.
 
-> 🎯 **Consiglio sulla scelta del video:** prendi un segmento di **10–15 minuti di
+> **Consiglio sulla scelta del video:** prendi un segmento di **10–15 minuti di
 > combattimento** (tanti attacchi, tiri, azioni). Evita le parti dove si spiega il
 > programma o si fanno lunghe intro: sono "rumore" e allungano solo i tempi. La
 > trascrizione automatica del parlato è imperfetta (nomi storpiati, frasi spezzate):
@@ -194,7 +158,7 @@ python transcribe.py "https://youtu.be/XXXX" --start 00:10:00 --end 00:25:00 --m
 La **prima volta** Whisper scarica il modello `medium` (~1.5 GB): è normale che ci metta
 un po'. Al termine viene creato/aggiornato `../data/transcript.jsonl`.
 
-> 💡 L'opzione C (`--start` / `--end`) scarica e trascrive **solo il segmento indicato**
+> L'opzione C (`--start` / `--end`) scarica e trascrive **solo il segmento indicato**
 > (es. dal minuto 10 al 25). È il modo migliore per prendere una scena di combattimento
 > da un video lungo senza scaricare/trascrivere tutte le 3 ore.
 
@@ -216,7 +180,7 @@ Ora sei pronto per lo Step 5 (`docker compose up --build`).
 
 ---
 
-## 7. Step 5 — Avvia TUTTO con un comando 🚀
+## 7. Step 5 — Avvia TUTTO con un comando
 
 Dalla cartella del progetto:
 
@@ -251,9 +215,9 @@ docker compose down -v
 
 1. Apri il browser su **<http://localhost:5601>** (Kibana).
 2. La **data view** `D&D Enriched` viene creata automaticamente. Se Kibana ti chiede di
-   crearne una a mano: menu ☰ → **Stack Management → Data Views → Create data view**,
+ crearne una a mano: menu → **Stack Management → Data Views → Create data view**,
    nome indice `dnd-enriched*`, campo tempo `@timestamp`.
-3. Menu ☰ → **Discover**: vedrai gli eventi arricchiti che arrivano in tempo reale.
+3. Menu → **Discover**: vedrai gli eventi arricchiti che arrivano in tempo reale.
    In alto a destra imposta l'intervallo su **"Last 15 minutes"** e attiva
    l'aggiornamento automatico (Auto-refresh, es. ogni 5s).
    Aggiungi a sinistra i campi: `character`, `dm_hint`, `party_risk`, `action`.
@@ -264,14 +228,14 @@ Fai questi passi **mentre la pipeline gira**, così vedi i pannelli popolarsi.
 
 **Apri il costruttore**
 
-1. Menu ☰ → **Dashboard → Create dashboard**: vedi una tela vuota.
+1. Menu → **Dashboard → Create dashboard**: vedi una tela vuota.
 2. In alto a destra metti l'intervallo su **"Last 1 hour"** (così i dati ci sono di sicuro).
 
 **Pannello 1 — Feed dei consigli DM (il cuore della demo)**
 
 Si prende da Discover, perché mostra i record "uno a uno" come una chat:
 
-1. ☰ → **Discover**, con le colonne `character`, `action`, `party_risk`, `dm_hint`.
+1. → **Discover**, con le colonne `character`, `action`, `party_risk`, `dm_hint`.
 2. In alto a destra **Save** → nome `Feed DM`.
 3. Torna in dashboard → **Add from library** → seleziona `Feed DM`.
 
@@ -310,7 +274,7 @@ Si prende da Discover, perché mostra i record "uno a uno" come una chat:
 > curl -X DELETE http://localhost:9200/dnd-enriched   # svuota i risultati
 > docker compose run --rm producer                    # rigioca la partita
 > ```
-> ⚠️ Cancella **solo** l'indice dei dati: la dashboard e la data view restano salvate.
+> Cancella **solo** l'indice dei dati: la dashboard e la data view restano salvate.
 > NON usare `docker compose down -v` (cancellerebbe anche dashboard e data view).
 
 ---
@@ -341,11 +305,11 @@ Domande tipiche e risposte pronte:
 
 ---
 
-## 9-bis. ✅ Checklist giorno d'esame
+## 9-bis. Checklist giorno d'esame
 
 > Stampa o tieni aperta questa lista. È pensata per non lasciare nulla al caso.
 
-### 🏠 La sera prima (a casa)
+### La sera prima (a casa)
 - [ ] Trascritto il clip con Whisper `medium` e accorciato `data/transcript.jsonl` (solo combattimento).
 - [ ] Lanciato **almeno una volta** `docker compose up --build` con successo (così le immagini Docker restano in cache).
 - [ ] Visto arrivare gli eventi in **Kibana → Discover**.
@@ -356,25 +320,25 @@ Domande tipiche e risposte pronte:
 - [ ] Docker Desktop con ~8 GB di RAM assegnati.
 - [ ] `docker compose down` a fine prova (per ripartire pulito il giorno dopo).
 
-### 🎒 Cosa portare
+### Cosa portare
 - [ ] Il portatile **carico** (+ alimentatore).
-- [ ] **Hotspot dal telefono** pronto: serve internet per le chiamate a Claude. ⚠️ è il rischio n.1.
+- [ ] **Hotspot dal telefono** pronto: serve internet per le chiamate a Claude. è il rischio n.1.
 - [ ] La presentazione del design (schema della pipeline).
 - [ ] Il link al repo GitHub.
 
-### 🏫 In aula, prima di iniziare
+### In aula, prima di iniziare
 - [ ] Connesso a internet (wifi aula o hotspot) e verificato che funzioni.
 - [ ] Avviato in anticipo: `docker compose up -d` (lascia ~1-2 min che Kibana parta).
 - [ ] Aperto **http://localhost:5601** e caricata la **dashboard salvata**.
 - [ ] Impostato l'intervallo tempo su **"Last 15 minutes"** + **auto-refresh** (5s).
 
-### 🎬 Durante la demo
+### Durante la demo
 - [ ] Spiega lo schema seguendo **un evento** lungo la pipeline (vedi `pipeline_spiegazione.md`).
 - [ ] Al momento clou lancia in un secondo terminale: `docker compose restart producer`.
 - [ ] Mostra gli eventi e i **suggerimenti AI** che compaiono dal vivo nella dashboard.
 - [ ] Tieni pronte le **risposte alle domande tipiche** (sezione 9).
 
-### 🆘 Se qualcosa va storto
+### Se qualcosa va storto
 - [ ] Kibana vuoto → controlla l'intervallo tempo e l'auto-refresh.
 - [ ] Nessun `dm_hint` → problema di internet/credito API: passa all'hotspot.
 - [ ] Tutto bloccato → `docker compose down -v` e poi `docker compose up` (tieni questo come ultima spiaggia).
@@ -433,7 +397,7 @@ dnd-realtime-dm/
 
 ---
 
-## 13. Limitare e controllare la RAM (Mac 16 GB) 🧠
+## 13. Limitare e controllare la RAM (Mac 16 GB)
 
 Lo stack è composto da molti servizi Java/JVM (che tendono a "mangiare" RAM). Per questo
 il `docker-compose.yml` è **già configurato** per stare comodamente su un MacBook con
@@ -451,7 +415,7 @@ il `docker-compose.yml` è **già configurato** per stare comodamente su un MacB
 | Producer | 256 MB | — |
 | **Totale** | **~5,7 GB** | |
 
-Restano diversi GB liberi per macOS e il browser. 👍
+Restano diversi GB liberi per macOS e il browser.
 
 ### Cosa impostare in Docker Desktop
 **Settings → Resources → Memory**: assegna a Docker circa **8 GB** (non tutti i 16, così
@@ -464,7 +428,7 @@ Esempi sicuri:
 - Spark: `--driver-memory 700m` e `mem_limit: 1200m`
 - Kibana: lo usi solo per guardare → va bene così; se serve, `--max-old-space-size=400`.
 
-> ⚠️ Non scendere troppo con Elasticsearch (sotto ~384 MB può non avviarsi).
+> Non scendere troppo con Elasticsearch (sotto ~384 MB può non avviarsi).
 
 ### Controllare i consumi reali mentre gira
 In un secondo terminale:
@@ -482,4 +446,4 @@ docker compose up spark logstash producer         # poi l'elaborazione
 
 ---
 
-Buon lavoro e buona avventura! 🐉
+Buon lavoro e buona avventura!
