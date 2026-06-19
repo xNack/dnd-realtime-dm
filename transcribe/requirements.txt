@@ -1,0 +1,11 @@
+# Dipendenze per la trascrizione (si installano nel tuo computer, non in Docker).
+# Nota: usa Python 3.12 (Whisper/PyTorch non supportano ancora 3.14).
+# Le versioni sono "pinnate" per evitare conflitti su Mac Intel:
+#  - numba/llvmlite 0.60: hanno il pacchetto pronto (niente compilazione con CMake)
+#  - numpy < 2: richiesto da PyTorch 2.2 (con numpy 2.x Whisper va in errore)
+openai-whisper>=20231117
+yt-dlp>=2024.0.0
+numba==0.60.0
+numpy<2
+
+# Serve anche ffmpeg installato a livello di sistema (vedi GUIDA.md).

@@ -1,0 +1,18 @@
+# Segreti — NON caricare mai la chiave API su GitHub!
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Output Whisper di grandi dimensioni (tieni solo l'esempio in data/)
+*.mp3
+*.mp4
+*.wav
+*.webm
+*.m4a
+
+# Sistema
+.DS_Store

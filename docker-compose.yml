@@ -1,0 +1,218 @@
+# =============================================================================
+#  DM Assistant — Real-Time D&D Event Enrichment
+#  Progetto TAP 2025/2026
+#
+#  Avvia l'intera pipeline con UN solo comando:
+#     docker compose up --build
+#
+#  NOTA RAM: i servizi sono limitati (mem_limit + heap JVM) per girare bene su
+#  un Mac con 16 GB. Consumo totale di picco ~6-7 GB. Vedi GUIDA.md sezione RAM.
+#
+#  Servizi:
+#    kafka          -> bus di messaggi (topic: dnd-events, dnd-enriched)
+#    spark          -> legge dnd-events, chiama Claude, scrive dnd-enriched
+#    logstash       -> legge dnd-enriched da Kafka e indicizza su Elasticsearch
+#    elasticsearch  -> archivia/indicizza gli eventi arricchiti
+#    kibana         -> dashboard per il Dungeon Master
+#    kibana-setup   -> crea automaticamente la "data view" in Kibana
+#    producer       -> simula la partita: rigioca transcript.jsonl verso Kafka
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # APACHE KAFKA (modalità KRaft, senza Zookeeper) — bus di messaggi real-time
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: dnd-kafka
+    ports:
+      - "29092:29092"   # accesso da host (es. strumenti esterni): localhost:29092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: dnd-tap-cluster-0001
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"   # limita la RAM della JVM di Kafka
+    mem_limit: 1g
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # KAFKA-INIT — crea i topic PRIMA che Spark/producer partano (poi termina)
+  # Evita l'errore "UnknownTopicOrPartition" se Spark parte prima del producer.
+  # ---------------------------------------------------------------------------
+  kafka-init:
+    image: apache/kafka:3.8.0
+    container_name: dnd-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic dnd-events --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic dnd-enriched --partitions 1 --replication-factor 1
+        echo "[kafka-init] Topic dnd-events e dnd-enriched pronti."
+    restart: "no"
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # ELASTICSEARCH — indicizzazione degli eventi arricchiti
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: dnd-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false        # sicurezza disattivata: solo per uso locale/didattico
+      - xpack.license.self_generated.type=basic
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m       # heap ridotto per stare nei 16 GB
+    mem_limit: 1200m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # KIBANA — dashboard del Dungeon Master
+  # ---------------------------------------------------------------------------
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: dnd-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - NODE_OPTIONS=--max-old-space-size=512   # limita la RAM di Kibana
+    mem_limit: 1g
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q 'available'"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # KIBANA-SETUP — crea automaticamente la data view "dnd-enriched*"
+  # (gira una volta sola e poi termina)
+  # ---------------------------------------------------------------------------
+  kibana-setup:
+    image: curlimages/curl:8.8.0
+    container_name: dnd-kibana-setup
+    depends_on:
+      kibana:
+        condition: service_healthy
+    volumes:
+      - ./kibana/setup.sh:/setup.sh:ro
+    entrypoint: ["sh", "/setup.sh"]
+    networks: [dnd]
+    restart: "no"
+
+  # ---------------------------------------------------------------------------
+  # LOGSTASH — ingestion: legge dnd-enriched da Kafka -> Elasticsearch
+  # ---------------------------------------------------------------------------
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: dnd-logstash
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    environment:
+      - LS_JAVA_OPTS=-Xms256m -Xmx256m       # heap ridotto
+      - XPACK_MONITORING_ENABLED=false
+    mem_limit: 768m
+    depends_on:
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # SPARK — processing + enrichment con Claude (cuore del progetto)
+  # ---------------------------------------------------------------------------
+  spark:
+    build: ./spark
+    container_name: dnd-spark
+    env_file: .env
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - SOURCE_TOPIC=dnd-events
+      - SINK_TOPIC=dnd-enriched
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-haiku-4-5}
+      - SPARK_DAEMON_MEMORY=512m
+    mem_limit: 1500m
+    volumes:
+      - ./spark/stream_job.py:/app/stream_job.py:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    command: >
+      /opt/spark/bin/spark-submit
+      --master local[2]
+      --driver-memory 900m
+      --conf spark.sql.shuffle.partitions=2
+      --conf spark.ui.showConsoleProgress=false
+      /app/stream_job.py
+    networks: [dnd]
+
+  # ---------------------------------------------------------------------------
+  # PRODUCER — simula la partita: rigioca transcript.jsonl verso Kafka
+  # (rispetta i ritardi tra i timestamp reali)
+  # ---------------------------------------------------------------------------
+  producer:
+    build: ./producer
+    container_name: dnd-producer
+    environment:
+      - KAFKA_BOOTSTRAP=kafka:9092
+      - TOPIC=dnd-events
+      - TRANSCRIPT=/app/data/transcript.jsonl
+      - SESSION_ID=session-001
+      - CAMPAIGN=La Cripta del Re Goblin
+      - SPEED=8          # velocità di rigioco: 8 = 8x più veloce del tempo reale
+      - START_DELAY=25   # secondi di attesa iniziale (lascia avviare Spark/Kafka)
+    mem_limit: 256m
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    networks: [dnd]
+
+networks:
+  dnd:
+    driver: bridge
+
+volumes:
+  kafka-data:
+  es-data:
