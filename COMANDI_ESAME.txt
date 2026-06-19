@@ -1,136 +1,73 @@
 ==============================================================
-  COMANDI PER LA DEMO D'ESAME — DM Assistant (Real-Time D&D)
+  COME AVVIARE LA DEMO — DM Assistant (Real-Time D&D)
 ==============================================================
 
-Servono DUE finestre di Terminale.
-Per aprire una nuova finestra: Cmd + N
+Prerequisito: Docker Desktop avviato.
+Servono due finestre di Terminale (nuova finestra: Cmd + N).
 
 --------------------------------------------------------------
- TERMINALE 1 — ACCENDERE LO STACK
+ TERMINALE 1 — AVVIARE LA PIPELINE
 --------------------------------------------------------------
 
-1) Entra nella cartella del progetto (ATTENZIONE alle virgolette):
+  cd dnd-realtime-dm
+  docker compose up
 
-   cd ~/Library/CloudStorage   # <-- NON serve, vedi nota sotto
+Attendere nel log queste due righe (1-2 minuti):
+  dnd-spark   | [avvio] In ascolto su Kafka topic 'dnd-events'
+  dnd-kibana  | ... Kibana is now available
 
-   In pratica vai dove tieni la cartella "Projects", poi:
-
-   cd "Real-Time Dungeon Mastertap_dnd_realtime.htmltap_dnd_realtime.html"
-   cd dnd-realtime-dm
-
-   (Trucco: scrivi  cd Real  e premi TAB per completare il nome.)
-
-2) Controlla di essere nel posto giusto:
-
-   ls
-
-   Devi vedere: docker-compose.yml, demo-reset.sh, spark, ...
-
-3) Accendi tutta la pipeline:
-
-   docker compose up
-
-   ASPETTA queste due righe nel log (1-2 minuti):
-     dnd-spark   | [avvio] In ascolto su Kafka topic 'dnd-events'
-     dnd-kibana  | ... Kibana is now available
-
-   >>> LASCIA QUESTO TERMINALE APERTO <<<
-
+Lasciare questo terminale aperto.
 
 --------------------------------------------------------------
  BROWSER — APRIRE LA DASHBOARD
 --------------------------------------------------------------
 
-4) Vai su:   http://localhost:5601
-
-5) Menu ☰ (in alto a sinistra) -> Dashboard -> "DM Assistant - Live"
-
-6) In alto a destra:
-     - Intervallo tempo:  Last 30 minutes
-     - Auto-refresh:      5 secondi
-
+  http://localhost:5601
+  Menu ☰ -> Dashboard -> "DM Assistant - Live"
+  In alto a destra: intervallo "Last 30 minutes", auto-refresh 5s.
 
 --------------------------------------------------------------
- TERMINALE 2 — LANCIARE LA PARTITA (sincronizzata col video)
+ TERMINALE 2 — AVVIARE LA PARTITA (replay degli eventi)
 --------------------------------------------------------------
 
-7) Apri una NUOVA finestra di Terminale (Cmd + N) ed entra nella
-   stessa cartella:
+  cd dnd-realtime-dm
+  SPEED=1 START_DELAY=0 ./demo-reset.sh
 
-   cd "Real-Time Dungeon Mastertap_dnd_realtime.htmltap_dnd_realtime.html"
-   cd dnd-realtime-dm
+  (SPEED=1 = tempo reale. Valori piu' bassi = piu' lento.)
+  (Se "permission denied":  bash demo-reset.sh )
 
-8) Tieni il VIDEO sull'iPad gia' in PAUSA sul punto di inizio.
-
-9) Lancia la partita a velocita' reale:
-
-   SPEED=1 START_DELAY=0 ./demo-reset.sh
-
-   (Se dice "permission denied", usa invece:
-      SPEED=1 START_DELAY=0 bash demo-reset.sh )
-
-10) Appena nel terminale compare la riga:
-      [producer] inviato 00:00:00  vi faccio vedere ok vai
-    -> PREMI PLAY sul video. Da qui sono allineati.
-
+Lo script ripulisce i risultati precedenti e rigioca la sessione:
+i record arricchiti compaiono in Kibana in tempo reale.
 
 --------------------------------------------------------------
- COSA SUCCEDE / COSA DIRE
+ COSA OSSERVARE
 --------------------------------------------------------------
 
-- Terminale 2:
-    [OK] ... rischio=...   = Claude ha arricchito un evento di gioco
-    scartato (non e' gioco) = chiacchiera ignorata dal filtro
-
-- Kibana si riempie da sola: i record arrivano con qualche secondo
-  di ritardo sull'audio. E' NORMALE: e' la latenza vera della
-  pipeline (Kafka -> Spark -> Claude -> Elasticsearch -> Kibana).
-  Frase da dire: "il consiglio compare con un piccolo ritardo
-  perche' l'arricchimento con Claude avviene in streaming".
-
-- Onesta': la trascrizione e' PRE-REGISTRATA con Whisper; il
-  producer la RIGIOCA in streaming (replay), non e' trascrizione
-  dal vivo del video.
-
-- NON premere Ctrl+C durante la demo.
-
+- Nel Terminale 2:
+    [OK] ... rischio=...    -> evento di gioco arricchito da Claude
+    scartato (non e' gioco) -> frase non di gioco, filtrata
+- In Kibana i record arrivano con qualche secondo di ritardo
+  sull'evento: e' la latenza reale della pipeline
+  (Kafka -> Spark -> Claude -> Elasticsearch -> Kibana).
+- I dati sono pre-trascritti con Whisper e rigiocati in streaming
+  dal producer (replay), per simulare una sessione dal vivo.
 
 --------------------------------------------------------------
- A FINE DEMO — SPEGNERE
+ ARRESTO
 --------------------------------------------------------------
 
-11) Nel TERMINALE 1 premi:  Ctrl + C
-    (la dashboard RESTA salvata)
+  Terminale 1: Ctrl + C
+  docker compose down          (spegnimento pulito; la dashboard resta salvata)
 
-12) (facoltativo) Spegni pulito:
-
-    docker compose down
-
-    !!! NON usare mai  docker compose down -v  !!!
-    (il -v cancellerebbe la dashboard e i dati)
-
+  NB: non usare "docker compose down -v" (cancellerebbe dati e dashboard).
 
 --------------------------------------------------------------
- RIFARE LA DEMO UNA SECONDA VOLTA (senza riavviare tutto)
+ IN CASO DI PROBLEMI
 --------------------------------------------------------------
 
-Se lo stack e' gia' acceso, per ripulire e rigiocare basta:
-
-   SPEED=1 START_DELAY=0 ./demo-reset.sh
-
-(SPEED piu' basso = piu' lento. Es. SPEED=2 per andare piu' calmi.)
-
-
---------------------------------------------------------------
- SE QUALCOSA NON VA
---------------------------------------------------------------
-
-- In Kibana non compaiono record dopo 2 minuti:
-    in un terzo terminale (stessa cartella) lancia:
-      docker compose restart logstash
-    aspetta 30 secondi e controlla.
-
-- Verificare quanti record sono stati salvati:
+- Nessun record in Kibana dopo 2 minuti:
+    docker compose restart logstash
+- Verificare il numero di documenti salvati:
     curl "http://localhost:9200/dnd-enriched/_count?pretty"
 
 ==============================================================
