@@ -1,6 +1,5 @@
 # GUIDA passo-passo — DM Assistant (Progetto TAP)
 
-> Guida pensata per chi **parte da zero**: non serve conoscere Kafka, Spark o Elasticsearch.
 > Segui i passi nell'ordine. Dove vedi un blocco grigio, è un comando da copiare nel terminale.
 
 ---
@@ -26,7 +25,7 @@ Logstash, Elasticsearch, Kibana, Docker) sono descritti nel [README.md](README.m
    - Scaricalo da <https://www.docker.com/products/docker-desktop/>
    - Importante (Mac 16 GB): in **Settings → Resources → Memory** assegna a Docker
      circa **8 GB**. Lo stack è già limitato per consumarne ~6 GB di picco, quindi
-     lasci RAM libera a macOS. Dettagli e regolazioni nella **sezione 13 (RAM)**.
+     lasci RAM libera a macOS. Dettagli e regolazioni nella **sezione 11 (RAM)**.
    - Verifica che funzioni:
      ```bash
      docker --version
@@ -71,7 +70,7 @@ cd percorso/della/cartella/dnd-realtime-dm
 
 ### 4.2 — Aggiungi un piccolo credito (necessario per le API)
 Le API non sono incluse nell'abbonamento del chatbot: si pagano a consumo, ma costano
-**pochissimo** (vedi sezione 11). Per attivarle:
+**pochissimo** (vedi sezione 10). Per attivarle:
 1. In Console, menu in alto/laterale → **Billing** (o **Plans & Billing**).
 2. Clicca **Add credits / Set up payment**, inserisci la carta e aggiungi un piccolo
    importo (es. **5 $**): è più che sufficiente per molte sessioni di test.
@@ -197,17 +196,25 @@ Cosa succede dietro le quinte, in ordine:
 2. Spark si collega a Kafka e si mette in ascolto.
 3. Dopo ~25 secondi il **producer** inizia a rigiocare la partita.
 4. Per ogni evento, Spark chiama Claude e pubblica l'evento arricchito.
-5. Logstash lo indicizza in Elasticsearch e Kibana lo mostra.
+5. Logstash lo invia a Elasticsearch (che lo indicizza) e Kibana lo mostra.
 
 Vedrai nei log righe come:
 ```
 dnd-spark    | [enrich] 00:07:52 Thorin -> risk=medium | Il boss è ferito: spingi le guardie...
 ```
 
-Per **fermare tutto**: premi `Ctrl + C` nella finestra, poi (se vuoi ripartire da zero):
+Per **fermare tutto**: premi `Ctrl + C` nella finestra, poi spegni in modo pulito:
 ```bash
-docker compose down -v
+docker compose down
 ```
+Questo **conserva** i dati e la dashboard salvata in Kibana.
+
+> Solo se vuoi azzerare DAVVERO tutto (cancellando anche dashboard, data view e dati):
+> ```bash
+> docker compose down -v
+> ```
+> Il flag `-v` elimina i volumi: **perdi la dashboard "DM Assistant – Live"** e dovrai
+> ricostruirla. Usalo solo come ultima spiaggia o prima di aver creato la dashboard.
 
 ---
 
@@ -279,73 +286,7 @@ Si prende da Discover, perché mostra i record "uno a uno" come una chat:
 
 ---
 
-## 9. Come spiegarlo all'esame (mini-scaletta)
-
-All'esame hai 30 minuti: design + demo + domande. Una traccia:
-
-1. **Problema & dati**: una sessione D&D è un flusso di eventi con timestamp → caso d'uso
-   naturale per lo stream processing. La sorgente reale è un video YouTube trascritto con Whisper.
-2. **Architettura**: mostra lo schema (sezione 1) e segui il percorso di un evento.
-3. **Ingestion (Logstash)**: legge gli eventi arricchiti da Kafka e li indicizza in Elasticsearch.
-4. **Streaming (Kafka)**: disaccoppia produttore e consumatore; due topic `dnd-events` e `dnd-enriched`.
-5. **Processing (Spark Structured Streaming)**: legge in micro-batch, filtra il "non gioco"
-   e chiama l'LLM (`foreachBatch`).
-6. **Machine Learning / servizio esterno (Claude API)**: genera `dm_hint` e `party_risk`.
-7. **Indexing (Elasticsearch) + Visualization (Kibana)**: la dashboard live.
-8. **Orchestrazione (Docker Compose)**: tutto parte con un comando.
-9. **Demo live**: apri Kibana, fai `docker compose restart producer`, mostra i suggerimenti che arrivano.
-
-Domande tipiche e risposte pronte:
-- *Perché Kafka e non chiamare Spark direttamente?* → Disaccoppiamento, durabilità,
-  possibilità di replay e di aggiungere altri consumatori.
-- *Come eviti di elaborare le chiacchiere fuori gioco?* → Claude marca ogni frase con
-  `is_game_event`; Spark scarta quelle non di gioco (filtro semantico via LLM).
-- *Come gestisci gli errori dell'LLM?* → Se Claude non risponde o dà JSON non valido, c'è
-  un fallback che non blocca la pipeline (vedi `arricchisci` in `stream_job.py`).
-
----
-
-## 9-bis. Checklist giorno d'esame
-
-> Stampa o tieni aperta questa lista. È pensata per non lasciare nulla al caso.
-
-### La sera prima (a casa)
-- [ ] Trascritto il clip con Whisper `medium` e accorciato `data/transcript.jsonl` (solo combattimento).
-- [ ] Lanciato **almeno una volta** `docker compose up --build` con successo (così le immagini Docker restano in cache).
-- [ ] Visto arrivare gli eventi in **Kibana → Discover**.
-- [ ] **Creata e salvata la dashboard** in Kibana (così non la costruisci davanti al prof).
-- [ ] File `.env` con la chiave `ANTHROPIC_API_KEY` corretta.
-- [ ] **Credito API** disponibile su console.anthropic.com (controlla il saldo).
-- [ ] Progetto **caricato su GitHub** (richiesto dal prof) — senza il file `.env`!
-- [ ] Docker Desktop con ~8 GB di RAM assegnati.
-- [ ] `docker compose down` a fine prova (per ripartire pulito il giorno dopo).
-
-### Cosa portare
-- [ ] Il portatile **carico** (+ alimentatore).
-- [ ] **Hotspot dal telefono** pronto: serve internet per le chiamate a Claude. è il rischio n.1.
-- [ ] La presentazione del design (schema della pipeline).
-- [ ] Il link al repo GitHub.
-
-### In aula, prima di iniziare
-- [ ] Connesso a internet (wifi aula o hotspot) e verificato che funzioni.
-- [ ] Avviato in anticipo: `docker compose up -d` (lascia ~1-2 min che Kibana parta).
-- [ ] Aperto **http://localhost:5601** e caricata la **dashboard salvata**.
-- [ ] Impostato l'intervallo tempo su **"Last 15 minutes"** + **auto-refresh** (5s).
-
-### Durante la demo
-- [ ] Spiega lo schema seguendo **un evento** lungo la pipeline (vedi `pipeline_spiegazione.md`).
-- [ ] Al momento clou lancia in un secondo terminale: `docker compose restart producer`.
-- [ ] Mostra gli eventi e i **suggerimenti AI** che compaiono dal vivo nella dashboard.
-- [ ] Tieni pronte le **risposte alle domande tipiche** (sezione 9).
-
-### Se qualcosa va storto
-- [ ] Kibana vuoto → controlla l'intervallo tempo e l'auto-refresh.
-- [ ] Nessun `dm_hint` → problema di internet/credito API: passa all'hotspot.
-- [ ] Tutto bloccato → `docker compose down -v` e poi `docker compose up` (tieni questo come ultima spiaggia).
-
----
-
-## 10. Risoluzione problemi (Troubleshooting)
+## 9. Risoluzione problemi (Troubleshooting)
 
 | Sintomo | Causa probabile | Soluzione |
 |---|---|---|
@@ -354,7 +295,7 @@ Domande tipiche e risposte pronte:
 | Nei log di Spark: errore API key | Chiave mancante/sbagliata in `.env` | Controlla `ANTHROPIC_API_KEY`, poi `docker compose up` di nuovo |
 | `dm_hint` vuoti o "(non disponibile)" | Credito API esaurito o modello errato | Verifica il credito su console.anthropic.com e il valore di `CLAUDE_MODEL` |
 | Elasticsearch va in crash all'avvio | Poca RAM per Docker | Dai ≥ 8 GB a Docker (Settings → Resources) |
-| Voglio ripartire pulito | Dati vecchi in Kafka/ES | `docker compose down -v` poi `docker compose up --build` |
+| Voglio ripartire pulito | Dati vecchi in Kafka/ES | `docker compose down -v` poi `docker compose up --build` (NB: `-v` cancella anche la dashboard) |
 | La partita "scorre" troppo veloce/lenta | Velocità di rigioco | Cambia `SPEED` nel servizio `producer` in `docker-compose.yml` |
 
 Per vedere i log di un singolo servizio:
@@ -364,7 +305,7 @@ docker compose logs -f spark      # oppure: producer, logstash, kafka, kibana
 
 ---
 
-## 11. Quanto costa? (API Claude)
+## 10. Quanto costa? (API Claude)
 
 Ogni evento è **una** chiamata a Claude con poche centinaia di token. Con il modello
 `claude-haiku-4-5` una sessione di esempio (circa 25 eventi) costa **pochi centesimi**.
@@ -372,32 +313,7 @@ Per limitare i costi durante i test puoi accorciare `data/transcript.jsonl`.
 
 ---
 
-## 12. Struttura dei file (per orientarti)
-
-```
-dnd-realtime-dm/
-├── docker-compose.yml      ← avvia tutto
-├── .env.example            ← copia in .env e metti la chiave Claude
-├── data/
-│   └── transcript.jsonl    ← la partita (eventi). Generato da Whisper o di esempio
-├── transcribe/             ← Whisper: da video YouTube a transcript.jsonl
-│   └── transcribe.py
-├── producer/               ← simulatore: rigioca la partita verso Kafka
-│   └── producer.py
-├── spark/                  ← CUORE: Spark + chiamata a Claude
-│   ├── Dockerfile
-│   └── stream_job.py
-├── logstash/pipeline/
-│   └── logstash.conf       ← Kafka(dnd-enriched) → Elasticsearch
-├── kibana/
-│   └── setup.sh            ← crea la data view automaticamente
-├── GUIDA.md                ← questo file
-└── README.md               ← descrizione per GitHub
-```
-
----
-
-## 13. Limitare e controllare la RAM (Mac 16 GB)
+## 11. Limitare e controllare la RAM (Mac 16 GB)
 
 Lo stack è composto da molti servizi Java/JVM (che tendono a "mangiare" RAM). Per questo
 il `docker-compose.yml` è **già configurato** per stare comodamente su un MacBook con
@@ -445,5 +361,3 @@ docker compose up spark logstash producer         # poi l'elaborazione
 ```
 
 ---
-
-Buon lavoro e buona avventura!
