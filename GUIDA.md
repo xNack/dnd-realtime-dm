@@ -140,6 +140,15 @@ source .venv/bin/activate        # su Windows: .venv\Scripts\activate
 pip install -r requirements.txt  # installa Whisper e yt-dlp
 ```
 
+> **Versione di Python: usa 3.12.** Whisper e PyTorch non supportano ancora le versioni
+> più recenti (es. 3.14). Se `python -m venv` usa una versione diversa, crea l'ambiente
+> indicando esplicitamente la 3.12: `python3.12 -m venv .venv`.
+>
+> L'ultima riga (`pip install -r requirements.txt`) legge il file `requirements.txt` e
+> installa in automatico tutte le librerie necessarie, già nelle versioni giuste (le
+> versioni sono fissate apposta per evitare conflitti su Mac Intel). Serve anche **ffmpeg**
+> installato a livello di sistema (Passo 1).
+
 ### Passo 3 — Lancia la trascrizione con il modello `medium`
 Usa **`--model medium`**: è più preciso di `small` sui nomi e sull'italiano parlato veloce
 (è più lento, ma lo lanci una volta sola). Puoi passare un **link YouTube** oppure un
