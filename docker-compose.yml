@@ -8,11 +8,20 @@
 #  Servizi:
 #    kafka          -> bus di messaggi (topic: dnd-events, dnd-enriched)
 #    spark          -> legge dnd-events, chiama Claude, scrive dnd-enriched
-#    logstash       -> legge dnd-enriched da Kafka e indicizza su Elasticsearch
-#    elasticsearch  -> archivia/indicizza gli eventi arricchiti
+#    logstash       -> legge dnd-enriched da Kafka e lo invia a Elasticsearch
+#    elasticsearch  -> archivia e indicizza gli eventi arricchiti
 #    kibana         -> dashboard per il Dungeon Master
 #    kibana-setup   -> crea automaticamente la "data view" in Kibana
 #    producer       -> simula la partita: rigioca transcript.jsonl verso Kafka
+#
+#  Legenda delle direttive usate sotto:
+#    services:                  i componenti della pipeline
+#    image / build:             immagine pronta da scaricare / costruita da cartella locale
+#    environment:               impostazioni passate al servizio (indirizzi, topic, SPEED...)
+#    depends_on + healthcheck:  ordine di avvio (es. Spark parte dopo Kafka "sano")
+#    ports:                     porte raggiungibili dal computer (es. 5601 = Kibana)
+#    volumes:                   dati salvati su disco (sopravvivono ai riavvii)
+#    mem_limit:                 tetto di RAM per ogni servizio (per stare nei 16 GB)
 # =============================================================================
 
 services:
