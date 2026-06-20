@@ -27,7 +27,7 @@
 services:
 
   # ---------------------------------------------------------------------------
-  # APACHE KAFKA (modalità KRaft, senza Zookeeper) — bus di messaggi real-time
+  # APACHE KAFKA — bus di messaggi real-time
   # ---------------------------------------------------------------------------
   kafka:
     image: apache/kafka:3.8.0
