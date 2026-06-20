@@ -4,7 +4,7 @@
 
 ---
 
-## 1. Che cos'è questo progetto (in parole semplici)
+## 1. Che cos'è questo progetto
 
 Immagina una partita di **Dungeons & Dragons**. Ogni cosa che succede (un attacco, un tiro
 di dado, una cura) è un piccolo "evento". Questo progetto prende quel flusso di eventi
