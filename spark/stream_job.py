@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 # =============================================================================
-#  IL CUORE DEL PROGETTO — Spark legge gli eventi e li fa arricchire da Claude
+#  Il cuore del progetto — Spark legge gli eventi e li fa arricchire da Claude
 # =============================================================================
 #
-#  COME LEGGERE QUESTO FILE (spiegazione per chi parte da zero):
+#  Come leggere questo file:
 #
 #  - Spark è un "motore" che legge dati che arrivano in continuazione (uno
 #    "stream"). Qui i dati arrivano da Kafka, dal topic "dnd-events".
 #  - Spark lavora a piccoli gruppi di messaggi alla volta, chiamati "micro-batch".
 #    Per ogni gruppo, Spark esegue la nostra funzione `elabora_gruppo`.
-#  - Dentro quella funzione, per OGNI evento chiamiamo Claude (l'intelligenza
-#    artificiale) e gli chiediamo un CONSIGLIO per il Dungeon Master.
+#  - Dentro quella funzione, per ogni evento chiamiamo Claude (l'intelligenza
+#    artificiale) e gli chiediamo un consiglio per il Dungeon Master.
 #  - Il risultato (evento "arricchito") viene rispedito a Kafka, sul topic
 #    "dnd-enriched", da cui poi Logstash lo salva in Elasticsearch.
 #
-#  NOTA: questa versione è SEMPLIFICATA. Non tiene il conto dei punti vita (HP),
+#  Nota: questa versione è semplificata. Non tiene il conto dei punti vita (HP),
 #  perché nelle partite reali online spesso non si capisce chi perde vita. Ci
 #  concentriamo su ciò che conta davvero: il consiglio tattico per il DM.
 #
@@ -30,7 +30,7 @@ from pyspark.sql import SparkSession   # serve per avviare Spark
 
 
 # -----------------------------------------------------------------------------
-# PARTE 1 — Impostazioni (lette dal docker-compose, così non scriviamo dati
+# Parte 1 — Impostazioni (lette dal docker-compose, così non scriviamo dati
 #           "fissi" nel codice). os.getenv("NOME", "default") legge una variabile.
 # -----------------------------------------------------------------------------
 KAFKA = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")   # indirizzo di Kafka
@@ -47,19 +47,19 @@ API_URL = "https://api.anthropic.com/v1/messages"
 
 
 # -----------------------------------------------------------------------------
-# PARTE 2 — Un po' di "contesto": teniamo da parte le ultime frasi, così Claude
+# Parte 2 — Un po' di "contesto": teniamo da parte le ultime frasi, così Claude
 #           capisce meglio la situazione (cosa è successo poco prima).
 # -----------------------------------------------------------------------------
 ultimi_eventi = []   # lista delle ultime frasi della partita
 
 
 # -----------------------------------------------------------------------------
-# PARTE 3 — La chiamata a Claude.
+# Parte 3 — La chiamata a Claude.
 #           Gli mandiamo la frase grezza (+ le ultime frasi come contesto).
 #           Lui ci risponde con un piccolo JSON (un dizionario) già pronto.
 # -----------------------------------------------------------------------------
 
-# Questo testo spiega a Claude COME deve rispondere (sempre solo JSON).
+# Questo testo spiega a Claude come deve rispondere (sempre solo JSON).
 ISTRUZIONI = (
     "Sei l'assistente di un Dungeon Master in una partita di Dungeons & Dragons. "
     "Ti do una frase che descrive cosa è appena successo al tavolo. "
@@ -115,14 +115,14 @@ def chiedi_a_claude(frase):
 
 
 # -----------------------------------------------------------------------------
-# PARTE 4 — Da evento grezzo a evento arricchito.
+# Parte 4 — Da evento grezzo a evento arricchito.
 #           Usiamo la risposta di Claude per costruire l'evento finale,
 #           scartando ciò che non è un vero evento di gioco.
 # -----------------------------------------------------------------------------
 def arricchisci(evento):
     frase = evento.get("text", "")
 
-    # Proviamo a chiamare Claude. Se qualcosa va storto, NON blocchiamo tutto:
+    # Proviamo a chiamare Claude. Se qualcosa va storto, non blocchiamo tutto:
     # usiamo dei valori "di riserva" così la pipeline continua a funzionare.
     try:
         ai = chiedi_a_claude(frase)
@@ -133,7 +133,7 @@ def arricchisci(evento):
               "roll": None, "roll_type": "other",
               "party_risk": "unknown", "dm_hint": "(suggerimento non disponibile)"}
 
-    # FILTRO: se Claude dice che NON è un vero evento di gioco (chiacchiere, regole,
+    # Filtro: se Claude dice che non è un vero evento di gioco (chiacchiere, regole,
     # battute...), lo scartiamo: non lo mandiamo avanti e non finisce in dashboard.
     if not ai.get("is_game_event", True):
         print(f"[--] scartato (non è gioco): {frase[:60]}", flush=True)
@@ -161,7 +161,7 @@ def arricchisci(evento):
 
 
 # -----------------------------------------------------------------------------
-# PARTE 5 — Il collegamento con Spark.
+# Parte 5 — Il collegamento con Spark.
 #           `elabora_gruppo` viene chiamata da Spark per ogni micro-batch.
 # -----------------------------------------------------------------------------
 def elabora_gruppo(gruppo_df, numero_gruppo):
@@ -204,7 +204,7 @@ def main():
               .format("kafka")
               .option("kafka.bootstrap.servers", KAFKA)
               .option("subscribe", TOPIC_IN)
-              .option("startingOffsets", "latest")   # leggi solo i NUOVI eventi
+              .option("startingOffsets", "latest")   # leggi solo i nuovi eventi
               .option("maxOffsetsPerTrigger", 10)    # max 10 eventi per micro-batch:
               .load())                               # così Spark scrive spesso e i record
                                                      # compaiono "a ondate" (utile per la demo)
