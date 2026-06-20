@@ -3,7 +3,7 @@
 #  TRASCRIZIONE DEL VIDEO (si esegue UNA volta sola, sul tuo computer)
 # =============================================================================
 #
-#  COSA FA (in parole semplici):
+#  COSA FA:
 #  1. Scarica l'audio di un video YouTube (con il programma yt-dlp).
 #  2. Lo trasforma in testo con Whisper (l'AI di OpenAI per il riconoscimento
 #     vocale), tenendo anche i tempi (minuto:secondo) di ogni frase.
