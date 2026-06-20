@@ -64,3 +64,11 @@ dnd-realtime-dm/
 ├── pipeline_spiegazione.md   # un evento seguito lungo tutta la pipeline
 └── README.md
 ```
+
+---
+
+## Sicurezza
+
+La chiave API di Claude è tenuta **fuori dal repository**: vive solo nel file `.env`
+(escluso da Git tramite `.gitignore`). Nel repo è presente solo `.env.example` con un
+segnaposto: ogni utente inserisce la propria chiave dopo aver clonato il progetto.
