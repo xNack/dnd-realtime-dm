@@ -3,13 +3,11 @@
 #  IL SIMULATORE DELLA PARTITA
 # =============================================================================
 #
-#  COSA FA (in parole semplici):
+#  COSA FA:
 #  - Legge il file con gli eventi della partita (data/transcript.jsonl).
 #  - Invia un evento alla volta a Kafka (sul topic "dnd-events").
 #  - Aspetta tra un evento e l'altro per imitare il ritmo della partita reale,
 #    così sembra che la sessione stia avvenendo "in diretta".
-#
-#  In gergo, un programma che "produce" messaggi per Kafka si chiama PRODUCER.
 # =============================================================================
 
 import os
