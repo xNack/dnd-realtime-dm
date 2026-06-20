@@ -8,6 +8,8 @@ visualizzati su una dashboard per il Dungeon Master.
 
 **Guida passo-passo completa (installazione, avvio, demo):** vedi **[GUIDA.md](GUIDA.md)**.
 
+**Come funziona la pipeline (un evento seguito passo-passo, con esempi reali):** vedi **[pipeline_spiegazione.md](pipeline_spiegazione.md)**.
+
 ---
 
 ## Architettura
@@ -33,8 +35,11 @@ YouTube ─(Whisper)→ transcript.jsonl ─→ Producer ─→ Kafka(dnd-events
 
 ## Requisiti
 
+- **Computer con almeno 16 GB di RAM** (lo stack consuma ~6 GB di picco; servono ~8 GB liberi per Docker).
 - **Docker Desktop** con almeno **8 GB di RAM** assegnati.
 - Una **chiave API Claude** (Anthropic) → <https://console.anthropic.com>.
+
+> Macchina di test: **MacBook Pro 16" (2019)** — Intel Core **i9 8-core a 2,3 GHz (9ª generazione)**, **16 GB di RAM DDR4 2667 MHz**, **macOS Tahoe 26.5.1**.
 
 Il progetto include già una sessione di esempio (`data/transcript.jsonl`): funziona
 out-of-the-box senza dover trascrivere alcun video. Tutti i passaggi di installazione e
@@ -54,6 +59,7 @@ dnd-realtime-dm/
 ├── spark/stream_job.py       # Spark + enrichment con Claude (cuore)
 ├── logstash/pipeline/        # Kafka(dnd-enriched) → Elasticsearch
 ├── kibana/setup.sh           # crea la data view automaticamente
-├── GUIDA.md                  # guida passo-passo (italiano)
+├── GUIDA.md                  # guida passo-passo
+├── pipeline_spiegazione.md   # un evento seguito lungo tutta la pipeline
 └── README.md
 ```
