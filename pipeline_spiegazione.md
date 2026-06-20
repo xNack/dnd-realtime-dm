@@ -1,7 +1,7 @@
-# 🔎 La pipeline spiegata passo-passo (con esempi reali)
+# La pipeline spiegata passo-passo (con esempi reali)
 
 Questo file segue **un solo evento** della partita lungo TUTTA la pipeline, mostrando
-com'è fatto il dato a ogni passaggio. Se capisci questo, capisci tutto il progetto.
+com'è fatto il dato a ogni passaggio.
 
 > Idea chiave: un dato entra **grezzo** (una frase) ed esce **arricchito** (un
 > suggerimento per il Dungeon Master, pronto da vedere su una dashboard).
@@ -33,8 +33,8 @@ com'è fatto il dato a ogni passaggio. Se capisci questo, capisci tutto il proge
                                      [9] Kibana (dashboard)
 ```
 
-Seguiamo un momento **reale** della nostra partita: all'inizio del combattimento il
-master dice una frase trascritta in modo impreciso — **"warador è il primo"** — e vediamo
+Si segue un momento **reale** della partita: all'inizio del combattimento il
+master dice una frase trascritta in modo impreciso — **"warador è il primo"** — e si vede
 come la pipeline la trasforma in un consiglio chiaro per il Dungeon Master.
 
 > Perché questo esempio è utile: la trascrizione è "sporca" (minuscole, nome storpiato).
@@ -43,22 +43,24 @@ come la pipeline la trasforma in un consiglio chiaro per il Dungeon Master.
 
 ---
 
-## [1] Sorgente — Video YouTube 🎬
+## [1] Sorgente — Video YouTube
 
-Il punto di partenza è un video reale di una sessione di D&D (o un file video tuo).
-Contiene solo **audio**: voci dei giocatori. Non è ancora un "dato" utilizzabile.
+Il punto di partenza è un video di una sessione di D&D: può essere un video di YouTube
+oppure un file video locale. Contiene solo **audio**: le voci dei giocatori. Non è ancora
+un "dato" utilizzabile.
 
 **Cosa entra:** un file video/audio (es. `sessione.mp4`).
 
 ---
 
-## [2] Whisper — da audio a testo 📝
+## [2] Whisper — da audio a testo
 
-Whisper (l'AI di OpenAI per il riconoscimento vocale) ascolta l'audio e lo trascrive
-in frasi, **tenendo i tempi** (minuto:secondo) di ognuna. Lo eseguiamo **una volta sola**,
-sul tuo computer, prima di avviare la pipeline.
+Whisper (il modello di OpenAI per il riconoscimento vocale) ascolta l'audio e lo trascrive
+in frasi, **tenendo i tempi** (minuto:secondo) di ognuna. Viene eseguito **una volta sola**,
+in locale, prima di avviare la pipeline, tramite lo script `transcribe/transcribe.py`.
 
-**Cosa produce:** il file `data/transcript.jsonl`. Una riga = una frase = un evento.
+**Cosa produce:** il file `data/transcript.jsonl` (generato da `transcribe.py`). Una riga =
+una frase = un evento.
 
 Esempio di **UNA riga** del file:
 
@@ -71,11 +73,11 @@ Esempio di **UNA riga** del file:
 
 ---
 
-## [3] Producer — "rigioca" la partita ▶️
+## [3] Producer — "rigioca" la partita
 
-Il producer **rilegge** quel file e invia gli eventi a Kafka uno alla volta,
-aspettando tra l'uno e l'altro per imitare il ritmo reale ("replay"). Prima di inviare,
-aggiunge dei **metadati** (a quale sessione/campagna appartiene l'evento).
+Il producer (`producer/producer.py`) **rilegge** quel file e invia gli eventi a Kafka uno
+alla volta, aspettando tra l'uno e l'altro per imitare il ritmo reale ("replay"). Prima di
+inviare, aggiunge dei **metadati** (a quale sessione/campagna appartiene l'evento).
 
 **Cosa produce:** un messaggio Kafka sul topic **`dnd-events`**.
 
@@ -95,7 +97,7 @@ Esempio del **messaggio** inviato:
 
 ---
 
-## [4] Apache Kafka — il "nastro trasportatore" 🛤️
+## [4] Apache Kafka
 
 Kafka è una coda di messaggi in tempo reale. Tiene gli eventi in ordine sul topic
 `dnd-events` e li mette a disposizione di chi li vuole leggere (qui: Spark).
@@ -108,10 +110,10 @@ aggiungere in futuro altri consumatori.
 
 ---
 
-## [5] Spark — legge e coordina l'arricchimento ⚙️
+## [5] Spark — legge e coordina l'arricchimento
 
-Spark legge gli eventi da `dnd-events` a piccoli gruppi ("micro-batch", qui fino a 10
-messaggi per volta). Attenzione a due livelli diversi:
+Spark (lo script `spark/stream_job.py`) legge gli eventi da `dnd-events` a piccoli gruppi
+("micro-batch", qui fino a 10 messaggi per volta). Attenzione a due livelli diversi:
 
 - **Spark** consegna un *gruppo* di frasi tutte insieme (il micro-batch);
 - il **nostro codice** poi cicla il gruppo **una frase alla volta**.
@@ -138,7 +140,7 @@ Nuova frase: "warador è il primo"
 
 ---
 
-## [6] Claude — l'intelligenza artificiale 🧙
+## [6] Claude — l'intelligenza artificiale
 
 Claude legge la frase, capisce cosa è successo e risponde **solo con un JSON** già
 strutturato, con il suggerimento per il DM.
@@ -157,7 +159,7 @@ strutturato, con il suggerimento per il DM.
 }
 ```
 
-Nota cosa ha fatto Claude: ha **corretto** il nome (`warador` → `Warador`), ha **riscritto**
+Si nota cosa ha fatto Claude: ha **corretto** il nome (`warador` → `Warador`), ha **riscritto**
 la frase storpiata in italiano chiaro, e ha aggiunto un **consiglio** per il DM. Qui non
 c'è un tiro di dado, quindi `roll` è `null` e `roll_type` è `"other"`.
 
@@ -167,7 +169,7 @@ Spark assembla l'evento finale.
 
 ---
 
-## [6→7] L'evento arricchito torna su Kafka 📤
+## [6→7] L'evento arricchito torna su Kafka
 
 Spark scrive il risultato sul topic **`dnd-enriched`**.
 
@@ -189,23 +191,23 @@ Esempio del **messaggio arricchito**:
 }
 ```
 
-Nota la differenza con il punto [3]: prima c'era solo la frase grezza `"warador è il primo"`;
+Si nota la differenza con il punto [3]: prima c'era solo la frase grezza `"warador è il primo"`;
 ora c'è **l'interpretazione completa** (nome corretto, azione chiara) + il suggerimento per
 il DM. Ecco l'arricchimento. È stato aggiunto anche `ingest_ts` = quando Spark l'ha elaborato.
 
 ---
 
-## [7] Logstash — porta i dati in Elasticsearch 🚚
+## [7] Logstash — porta i dati in Elasticsearch
 
-Logstash è lo strumento di *ingestion*: legge i messaggi da `dnd-enriched`, li interpreta
-come JSON e li **consegna a Elasticsearch**, un documento alla volta. Imposta anche il
-campo data (`@timestamp`) usato per ordinarli nel tempo.
+Logstash (configurato in `logstash/pipeline/logstash.conf`) è lo strumento di *ingestion*:
+legge i messaggi da `dnd-enriched`, li interpreta come JSON e li **consegna a Elasticsearch**,
+un documento alla volta. Imposta anche il campo data (`@timestamp`) usato per ordinarli nel tempo.
 
 **Il dato qui resta lo stesso** del punto [6→7]; cambia solo "dove va": da Kafka a Elasticsearch.
 
 ---
 
-## [8] Elasticsearch — l'archivio ricercabile 🗄️
+## [8] Elasticsearch — l'archivio ricercabile
 
 Ogni evento arricchito diventa un **documento** dentro l'indice `dnd-enriched`.
 Elasticsearch li conserva e permette di **cercarli, filtrarli e contarli** velocemente
@@ -215,7 +217,7 @@ Elasticsearch li conserva e permette di **cercarli, filtrarli e contarli** veloc
 
 ---
 
-## [9] Kibana — la dashboard del Dungeon Master 📊
+## [9] Kibana — la dashboard del Dungeon Master
 
 Kibana legge da Elasticsearch e **mostra i dati graficamente**, aggiornandosi da solo a
 ogni nuovo evento. Il nostro evento "Warador è il primo" appare:
@@ -239,20 +241,4 @@ all'uso per condurre la partita.
 | [8] Elasticsearch | stesso JSON arricchito, **salvato e ricercabile** |
 | [9] Kibana | una **riga/grafico** leggibile per il Dungeon Master |
 
-In una frase: **da una frase grezza a un consiglio tattico, in tempo reale.**
-
----
-
-## Le tecnologie e il loro ruolo (per il colloquio)
-
-| # | Tecnologia | Ruolo nel progetto | Categoria TAP |
-|---|---|---|---|
-| 2 | Whisper | audio → testo con timestamp | Sorgente / pre-processing |
-| 3 | Producer (Python) | "rigioca" la partita verso Kafka | Simulazione sorgente |
-| 4 | Apache Kafka | bus di messaggi, disaccoppia e ordina | **Streaming** |
-| 5 | Spark Structured Streaming | legge in micro-batch, filtra e orchestra l'arricchimento | **Processing** |
-| 6 | Claude (API) | genera il suggerimento (`dm_hint`) | **Machine Learning / servizio esterno** |
-| 7 | Logstash | da Kafka a Elasticsearch | **Ingestion** |
-| 8 | Elasticsearch | archivia e indicizza | **Indexing** |
-| 9 | Kibana | dashboard real-time | **Visualization** |
-| — | Docker Compose | avvia tutto con un comando | Orchestrazione |
+In conclusione: **da una frase grezza a un consiglio tattico, in tempo reale.**
