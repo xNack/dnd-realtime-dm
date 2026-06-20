@@ -361,3 +361,56 @@ docker compose up spark logstash producer         # poi l'elaborazione
 ```
 
 ---
+
+## Appendice — Riepilogo comandi (avvio rapido della demo)
+
+Prerequisito: **Docker Desktop avviato**. Servono due finestre di Terminale.
+
+**Terminale 1 — avvia la pipeline**
+```bash
+cd dnd-realtime-dm
+docker compose up
+```
+Attendi nel log queste due righe (1-2 minuti):
+```
+dnd-spark   | [avvio] In ascolto su Kafka topic 'dnd-events'
+dnd-kibana  | ... Kibana is now available
+```
+Lascia questo terminale aperto.
+
+**Browser — apri la dashboard**
+```
+http://localhost:5601   →  Menu ☰ → Dashboard → "DM Assistant - Live"
+```
+In alto a destra: intervallo "Last 30 minutes", auto-refresh 5s.
+
+**Terminale 2 — avvia la partita (replay degli eventi)**
+```bash
+cd dnd-realtime-dm
+SPEED=1 START_DELAY=0 ./demo-reset.sh
+```
+- `SPEED=1` = tempo reale (valori più bassi = più lento).
+- Se compare "permission denied": usa `bash demo-reset.sh`.
+
+Lo script ripulisce i risultati precedenti e rigioca la sessione: i record arricchiti
+compaiono in Kibana in tempo reale.
+
+**Cosa osservare**
+- Terminale 2: `[OK] ... rischio=...` = evento arricchito da Claude; `scartato (non è gioco)` = frase filtrata.
+- In Kibana i record arrivano con qualche secondo di ritardo: è la latenza reale della pipeline
+  (Kafka → Spark → Claude → Elasticsearch → Kibana).
+
+**Arresto**
+```bash
+# Terminale 1: Ctrl + C, poi:
+docker compose down          # spegnimento pulito; la dashboard resta salvata
+```
+Non usare `docker compose down -v` (cancellerebbe dati e dashboard).
+
+**In caso di problemi**
+```bash
+docker compose restart logstash                        # se non compaiono record dopo 2 minuti
+curl "http://localhost:9200/dnd-enriched/_count?pretty" # quanti documenti sono stati salvati
+```
+
+---
