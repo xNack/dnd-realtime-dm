@@ -59,6 +59,7 @@ dnd-realtime-dm/
 ├── spark/stream_job.py       # Spark + enrichment con Claude (cuore)
 ├── logstash/pipeline/        # Kafka(dnd-enriched) → Elasticsearch
 ├── kibana/setup.sh           # crea la data view automaticamente
+├── demo-reset.sh             # svuota i risultati e rigioca la partita (per la demo)
 ├── GUIDA.md                  # guida passo-passo
 ├── pipeline_spiegazione.md   # un evento seguito lungo tutta la pipeline
 └── README.md
