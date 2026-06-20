@@ -1,7 +1,4 @@
 # =============================================================================
-#  DM Assistant — Real-Time D&D Event Enrichment
-#  Progetto TAP 2025/2026
-#
 #  Avvia l'intera pipeline con UN solo comando:
 #     docker compose up --build
 #
