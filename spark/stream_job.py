@@ -168,7 +168,12 @@ def elabora_gruppo(gruppo_df, numero_gruppo):
     # `gruppo_df` è una tabella di Spark con i messaggi arrivati da Kafka.
     # Il valore del messaggio è in byte: lo convertiamo in testo e lo portiamo
     # nel programma Python con .collect() (sono pochi messaggi, va bene così).
-    righe = gruppo_df.selectExpr("CAST(value AS STRING) AS testo").collect()
+    # Ordiniamo per "offset" Kafka: così elaboriamo gli eventi nello STESSO ordine
+    # in cui sono stati inviati (= ordine della partita). Senza, Spark potrebbe
+    # processarli in ordine sparso dentro il micro-batch e l'orario di elaborazione
+    # (@timestamp) risulterebbe leggermente fuori sequenza.
+    righe = (gruppo_df.selectExpr("CAST(value AS STRING) AS testo", "offset")
+             .orderBy("offset").collect())
     if not righe:
         return   # nessun messaggio in questo gruppo: non facciamo nulla
 
