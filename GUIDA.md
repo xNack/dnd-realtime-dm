@@ -371,38 +371,42 @@ docker compose up spark logstash producer         # poi l'elaborazione
 
 ---
 
-## Appendice — Riepilogo comandi (avvio rapido della demo)
+## Appendice — Comandi per la demo (procedura testata)
 
-Prerequisito: **Docker Desktop avviato**. Servono due finestre di Terminale.
+Prerequisito: **Docker Desktop avviato**. Servono due finestre di Terminale (nuova: Cmd + N).
 
-**Terminale 1 — avvia la pipeline**
+**Terminale 1 — avvio pulito della pipeline**
 ```bash
 cd dnd-realtime-dm
+docker compose down
+docker volume rm dnd-realtime-dm_kafka-data
 docker compose up
 ```
-Attendi nel log queste due righe (1-2 minuti):
-```
-dnd-spark   | [avvio] In ascolto su Kafka topic 'dnd-events'
-dnd-kibana  | ... Kibana is now available
-```
-Lascia questo terminale aperto.
+- I primi due comandi azzerano la **coda di Kafka** dei test precedenti (così gli eventi
+  non si accavallano e arrivano in ordine). La dashboard salvata in Kibana **resta**.
+- Attendi nel log: `dnd-spark | [avvio] In ascolto su Kafka topic 'dnd-events'` e
+  `dnd-kibana | ... Kibana is now available`. Lascia questo terminale aperto.
 
 **Browser — apri la dashboard**
 ```
 http://localhost:5601   →  Menu ☰ → Dashboard → "DM Assistant - Live"
 ```
 In alto a destra: intervallo "Last 30 minutes", auto-refresh 5s.
+Ordina la tabella per **@timestamp crescente** (o per `event_time` se vuoi l'ordine di gioco garantito).
 
-**Terminale 2 — avvia la partita (replay degli eventi)**
+**Terminale 2 — avvia la partita (una sola volta)**
 ```bash
 cd dnd-realtime-dm
-SPEED=1 START_DELAY=0 ./demo-reset.sh
+SPEED=1 START_DELAY=20 ./demo-reset.sh
 ```
-- `SPEED=1` = tempo reale (valori più bassi = più lento).
+- `SPEED=1` = tempo reale (valori più bassi = più lento; `SPEED=4` per i test rapidi).
+- `START_DELAY=20` dà tempo a Spark di mettersi in ascolto, così **non salta i primi eventi**
+  (l'iniziativa compare per prima).
+- `demo-reset.sh` ricrea Spark dalla coda vuota, svuota i risultati vecchi e rigioca la
+  partita: i record arricchiti compaiono in Kibana in tempo reale.
 - Se compare "permission denied": usa `bash demo-reset.sh`.
 
-Lo script ripulisce i risultati precedenti e rigioca la sessione: i record arricchiti
-compaiono in Kibana in tempo reale.
+> Regola d'oro: **una partita alla volta**. Per rigiocare, rilancia il comando del Terminale 2.
 
 **Cosa osservare**
 - Terminale 2: `[OK] ... rischio=...` = evento arricchito da Claude; `scartato (non è gioco)` = frase filtrata.
@@ -411,6 +415,7 @@ compaiono in Kibana in tempo reale.
 
 **Arresto**
 ```bash
+# Terminale 2: Ctrl + C  (ferma solo la partita)
 # Terminale 1: Ctrl + C, poi:
 docker compose down          # spegnimento pulito; la dashboard resta salvata
 ```
