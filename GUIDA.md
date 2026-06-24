@@ -406,7 +406,7 @@ SPEED=1 START_DELAY=20 ./demo-reset.sh
   partita: i record arricchiti compaiono in Kibana in tempo reale.
 - Se compare "permission denied": usa `bash demo-reset.sh`.
 
-> Regola d'oro: **una partita alla volta**. Per rigiocare, rilancia il comando del Terminale 2.
+> **Una partita alla volta.** Per rigiocare, rilancia il comando del Terminale 2.
 
 **Cosa osservare**
 - Terminale 2: `[OK] ... rischio=...` = evento arricchito da Claude; `scartato (non è gioco)` = frase filtrata.
